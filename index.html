@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeSafe Jev 1.14.0 使用教程：System One 决策 API 从入门到 box 定位</title>
+<meta name="description" content="本教程面向要把 TypeSafe Jev jev-1.14.0 接到业务代码里的工程师：从申请/配置 API Key、发出第一个请求，到四种题型、多题并行、图片 + box、长上下文、置信度落地，再到排错。目标是一份可照抄改写的动手指南，不是产品软文。 先对齐心智模型：Jev 是 TypeSafe 的 System O">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f5f0;--card:#fff;--text:#1a1a1a;--muted:#5c5c5c;--accent:#1a73e8;--border:#e6e2d8;--code-bg:#f0eee8}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;font-size:17px;line-height:1.85;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:2.5rem 1.25rem 4rem}
+article{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem 1.75rem 2.5rem;box-shadow:0 8px 30px rgba(0,0,0,.04)}
+h1{font-family:"Noto Serif SC",serif;font-size:clamp(1.55rem,4vw,2rem);line-height:1.4;margin:0 0 1.25rem;font-weight:700}
+h2{font-family:"Noto Serif SC",serif;font-size:1.35rem;margin:2.25rem 0 .9rem;padding-top:.5rem;border-top:1px solid var(--border);font-weight:700}
+h2:first-of-type{border-top:none;padding-top:0}h3{font-size:1.1rem;margin:1.5rem 0 .6rem}
+p{margin:.9rem 0}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+ul,ol{padding-left:1.35rem;margin:.8rem 0}li{margin:.35rem 0}strong{font-weight:700}
+img{display:block;max-width:100%;height:auto;margin:1.1rem auto .35rem;border-radius:10px;border:1px solid var(--border);background:#fafafa}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;overflow-x:auto;font-size:.88rem;line-height:1.55}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--code-bg);padding:.1em .35em;border-radius:4px}
+pre code{background:none;padding:0}
+blockquote{margin:1rem 0;padding:.2rem 0 .2rem 1rem;border-left:3px solid var(--accent);color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.95rem}
+th,td{border:1px solid var(--border);padding:.55rem .7rem;text-align:left;vertical-align:top}th{background:#f3f1eb}
+.meta{color:var(--muted);font-size:.92rem;margin-bottom:1.5rem}
+.pages-banner{margin:0 0 1.25rem;padding:.75rem 1rem;background:#eef5ff;border:1px solid #d0e2ff;border-radius:10px;font-size:.95rem}
+footer{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--muted);font-size:.88rem}
+</style></head><body><div class="wrap"><article>
+<div class="pages-banner">在线阅读（GitHub Pages）：<a href="https://maynor996.github.io/typesafe-jev-1-14-guide/">https://maynor996.github.io/typesafe-jev-1-14-guide/</a></div>
+<h1>TypeSafe Jev 1.14.0 使用教程：System One 决策 API 从入门到 box 定位</h1>
+<div class="meta">原文：<a href="https://blog.csdn.net/xianyu120/article/details/168561123">https://blog.csdn.net/xianyu120/article/details/168561123</a></div>
+<p>本教程面向要把 <strong>TypeSafe Jev <code>jev-1.14.0</code></strong> 接到业务代码里的工程师：从申请/配置 API Key、发出第一个请求，到四种题型、多题并行、图片 + <code>box</code>、长上下文、置信度落地，再到排错。目标是一份<strong>可照抄改写的动手指南</strong>，不是产品软文。</p>
+<p>先对齐心智模型：Jev 是 TypeSafe 的 <strong>System One 决策模型</strong>。你把业务上下文放进 <code>state</code>，再声明一组带类型的 <code>questions</code>；模型对同一份 <code>state</code> <strong>并行</strong>评估每道题，返回可分支、可阈值的结构化答案。它不陪聊、不追求长文生成——chat LLM 给你的是叙述，Jev 给你的是<strong>可编程的 smart-if</strong>。</p>
+<p><strong>版本钉死建议：</strong> 示例一律使用模型 ID <strong><code>jev-1.14.0</code></strong>。别名要小心：</p>
+<table>
+<thead>
+<tr>
+<th>别名</th>
+<th>文档含义</th>
+<th>实践建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>jev-preview</code></td>
+<td>指向最新预览构建（发布窗口内对应 <code>jev-1.14.0</code>）</td>
+<td>可试新特性；阈值标定后请改钉版本号</td>
+</tr>
+<tr>
+<td><code>jev-latest</code></td>
+<td>指向「当前稳定」并会在发布后滚动</td>
+<td><strong>不要</strong>当生产 SLA；响应里的 <code>model</code> 字段才是真实版本</td>
+</tr>
+</tbody>
+</table>
+<p>官方博客（2026-10-14）写明：<code>jev-latest</code> 会在约一周后切到 1.14；在此前后，你的置信度阈值若钉在某一版上，请求里请直接写 <code>jev-1.14.0</code> 或 <code>jev-1.13.0</code>。</p>
+<p><img alt="与 Jev 1.14 / System One 相关的发布示意" src="imgs/01.png" /></p>
+<hr />
+<h2>1. 从申请 Key 到请求骨架</h2>
+<h3>1.1 拿 Key</h3>
+<ol>
+<li>登录 TypeSafe 控制台，创建 API Key。</li>
+<li>只放服务端环境变量，不要写进前端或仓库：</li>
+</ol>
+<pre><code class="language-bash">export TYPESAFE_API_KEY=&quot;your-api-key&quot;
+</code></pre>
+<ol start="3">
+<li>可选：用 <code>GET https://api.typesafe.ai/v1/models</code> 看账号可见的模型名与别名（版本号 ID 即使未出现在列表里，请求里通常仍可直接写）。</li>
+</ol>
+<h3>1.2 唯一决策端点</h3>
+<pre><code class="language-http">POST https://api.typesafe.ai/v1/systemone
+Authorization: Bearer &lt;token&gt;
+Content-Type: application/json
+</code></pre>
+<p>危险区能力用<strong>额外请求头</strong>打开（按需、按请求）：</p>
+<pre><code class="language-http">TypeSafe-Danger-Zone-Images: true
+TypeSafe-Danger-Zone-Long-Context: true
+</code></pre>
+<h3>1.3 Body 字段</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>必填</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>是</td>
+<td>模型 ID 或别名；本教程固定 <code>jev-1.14.0</code></td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>是</td>
+<td>被评估内容：字符串 / JSON 对象 / 数组</td>
+</tr>
+<tr>
+<td><code>questions</code></td>
+<td>是</td>
+<td>命名问题字典；<code>answers</code> 用同名键回传</td>
+</tr>
+<tr>
+<td><code>assets</code></td>
+<td>否</td>
+<td>图片占位符 → 图像（multipart 的 <code>part</code> 或 <code>data_base64</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3>1.4 价格与默认上下文（与 1.13 对齐）</h3>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入</td>
+<td><strong>$0.042 / M tokens</strong>（文档亦写 $42 / B tokens）</td>
+</tr>
+<tr>
+<td>输出</td>
+<td><strong>免费</strong></td>
+</tr>
+<tr>
+<td>默认 per-request</td>
+<td><strong>64k</strong>（<code>state</code> + 全部问题合计）</td>
+</tr>
+<tr>
+<td>默认 per-question</td>
+<td><strong>32k</strong>（<code>state</code> + 任意单题）</td>
+</tr>
+<tr>
+<td>问题个数</td>
+<td><strong>无单独硬顶</strong>，只要塞进上述两道限制</td>
+</tr>
+</tbody>
+</table>
+<p>设计含义：鼓励「一次塞 state、一次扇出很多原子题」；限制主要在 token，不在题数。</p>
+<p><img alt="Models 文档：jev-1.14.0 与上下文说明" src="imgs/02.png" /></p>
+<hr />
+<h2>2. 第一个请求：打通一条 noul</h2>
+<p><code>noul</code> 回答「是否为真」：返回 <code>noul</code> ∈ <strong>[0, 1]</strong>。接近 1 偏是，接近 0 偏否，接近 0.5 表示不确定。<strong>没有单独的 <code>confidence</code> 字段</strong>——不确定度就在概率里；若要与 choice 同一套门禁，可用 <code>abs(2 * p - 1)</code> 映射到 0–1。</p>
+<pre><code class="language-bash">curl -sS https://api.typesafe.ai/v1/systemone \
+  -H &quot;Authorization: Bearer $TYPESAFE_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;model&quot;: &quot;jev-1.14.0&quot;,
+    &quot;state&quot;: &quot;I was charged twice for my subscription this month. Please refund the extra charge.&quot;,
+    &quot;questions&quot;: {
+      &quot;about_billing&quot;: {
+        &quot;type&quot;: &quot;noul&quot;,
+        &quot;instructions&quot;: &quot;Is this message about billing or charges?&quot;
+      }
+    }
+  }'
+</code></pre>
+<p>典型成功响应形状（数值会随版本微调）：</p>
+<pre><code class="language-json">{
+  &quot;model&quot;: &quot;jev-1.14.0&quot;,
+  &quot;answers&quot;: {
+    &quot;about_billing&quot;: { &quot;type&quot;: &quot;noul&quot;, &quot;noul&quot;: 0.98 }
+  },
+  &quot;usage&quot;: { &quot;input_tokens&quot;: 120, &quot;output_tokens&quot;: 12 }
+}
+</code></pre>
+<p>可选：用 <code>criteria</code> 澄清「什么算是 / 什么算否」，减少边界歧义：</p>
+<pre><code class="language-json">&quot;about_billing&quot;: {
+  &quot;type&quot;: &quot;noul&quot;,
+  &quot;instructions&quot;: &quot;Is this message about billing or charges?&quot;,
+  &quot;criteria&quot;: {
+    &quot;true&quot;: &quot;Mentions payment, invoice, refund, or subscription charge&quot;,
+    &quot;false&quot;: &quot;Unrelated to money or billing&quot;
+  }
+}
+</code></pre>
+<h3>Python SDK 草图</h3>
+<p>包名以官方文档为准（<code>typesafe-sdk</code>）。客户端默认读环境变量中的 Key：</p>
+<pre><code class="language-python">from typesafe_sdk import Noul, TypeSafeClient
+
+state = &quot;I was charged twice for my subscription this month. Please refund the extra charge.&quot;
+
+with TypeSafeClient() as client:
+    resp = client.system_one(
+        model=&quot;jev-1.14.0&quot;,
+        state=state,
+        questions={
+            &quot;about_billing&quot;: Noul(
+                instructions=&quot;Is this message about billing or charges?&quot;,
+            ),
+        },
+    )
+
+p = resp.answers[&quot;about_billing&quot;].noul
+print(&quot;noul=&quot;, p, &quot;self_conf≈&quot;, abs(2 * p - 1))
+</code></pre>
+<p>写题习惯：<strong>问题 ID 只给你代码用，不会当题面送给模型</strong>；完整判断逻辑写在 <code>instructions</code> 里。<code>state</code> 若是对象，用反引号路径引用字段，例如 <code>`ticket.body`</code>。</p>
+<hr />
+<h2>3. 四种题型：怎么选、返回什么</h2>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>一句话</th>
+<th>请求要点</th>
+<th>返回字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>noul</code></td>
+<td>是否为真？</td>
+<td><code>instructions</code>；可选 true/false criteria</td>
+<td><code>noul</code></td>
+</tr>
+<tr>
+<td><code>choice</code></td>
+<td>无序多选一</td>
+<td><strong>必填</strong> <code>criteria</code>：选项名 → 说明</td>
+<td><code>choice</code>、<code>probabilities</code>、<code>confidence</code></td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td>有序量尺上的位置</td>
+<td><strong>必填</strong> <code>criteria</code>：有序等级数组（从 0）</td>
+<td><code>score</code>、<code>legend</code>、<code>probabilities</code>、<code>confidence</code></td>
+</tr>
+<tr>
+<td><code>box</code></td>
+<td><strong>1.14 only</strong> 图上定位</td>
+<td>只要 <code>instructions</code>，<strong>无 criteria</strong>；需图像危险区头</td>
+<td><code>box{left,top,right,bottom}</code>（0–1 分数）+ <code>confidence</code></td>
+</tr>
+</tbody>
+</table>
+<p>选型口诀：</p>
+<ul>
+<li>要进哪个队列 / 哪种意图 → <strong><code>choice</code></strong>（选项互斥、无序）。</li>
+<li>要紧急度、严重度、满意度档位 → <strong><code>score</code></strong>（档位有序；<code>score</code> 可以是期望值，落在两档之间）。</li>
+<li>要「能不能自动放行」「有没有退款请求」→ <strong><code>noul</code></strong>。</li>
+<li>要「目标在图上的哪里」→ <strong><code>box</code></strong>，并<strong>永远</strong>再配一道存在性 <code>noul</code>。</li>
+</ul>
+<p>写题原则（官方也反复强调）：<strong>一道题只问一个「瞬间判断」</strong>。「分析这条消息并给出处理方案」太宽——拆成原子题，在你的代码里加权组合。答案被约束在你给的选项/等级上，不会吐自由文本标签，这正是可上线的原因。</p>
+<h3>3.1 choice 最小例</h3>
+<pre><code class="language-json">&quot;tone&quot;: {
+  &quot;type&quot;: &quot;choice&quot;,
+  &quot;instructions&quot;: &quot;What is the tone of this message?&quot;,
+  &quot;criteria&quot;: {
+    &quot;angry&quot;: &quot;Upset or hostile&quot;,
+    &quot;calm&quot;: &quot;Neutral or polite&quot;,
+    &quot;excited&quot;: &quot;Enthusiastic&quot;
+  }
+}
+</code></pre>
+<h3>3.2 score 最小例</h3>
+<pre><code class="language-json">&quot;urgency&quot;: {
+  &quot;type&quot;: &quot;score&quot;,
+  &quot;instructions&quot;: &quot;How urgent is this message?&quot;,
+  &quot;criteria&quot;: [
+    &quot;Can wait&quot;,
+    &quot;Needs attention this week&quot;,
+    &quot;Needs attention today&quot;
+  ]
+}
+</code></pre>
+<p><code>score</code> 是概率加权期望，可能是 <code>1.7</code> 这类小数；用 <code>legend</code> 把数字映射回你写的等级文案，用 <code>probabilities</code> 看各档分布。</p>
+<h3>3.3 box 特殊规则（务必记住）</h3>
+<ol>
+<li>需要 <code>TypeSafe-Danger-Zone-Images: true</code>。</li>
+<li>模型必须是 <strong><code>jev-1.14.0</code></strong>（或当时指向它的 preview 别名）。</li>
+<li><strong>总会返回一个框</strong>——没有「未找到」。目标不在图上时，框可能落到无关区域；所以同请求加 <code>noul</code>，低概率时丢弃框。</li>
+<li>坐标相对图像宽高：<code>left &lt; right</code>，<code>top &lt; bottom</code>，原点左上。</li>
+</ol>
+<hr />
+<h2>3.4 写好 <code>state</code> 与 <code>instructions</code></h2>
+<p><code>state</code> 可以是纯字符串，也可以是结构化 JSON。结构化时，在题面里用反引号引用路径，模型才知道「判哪一块」：</p>
+<pre><code class="language-json">{
+  &quot;ticket&quot;: {
+    &quot;subject&quot;: &quot;Duplicate charge&quot;,
+    &quot;messages&quot;: [
+      {&quot;from&quot;: &quot;customer&quot;, &quot;text&quot;: &quot;I was charged twice for order A-104. Please refund.&quot;}
+    ]
+  },
+  &quot;order&quot;: {&quot;id&quot;: &quot;A-104&quot;, &quot;charges&quot;: [{&quot;amount_usd&quot;: 49}, {&quot;amount_usd&quot;: 49}]},
+  &quot;refund_policy&quot;: &quot;Duplicate charges are eligible for a refund.&quot;
+}
+</code></pre>
+<p>对应题面示例：</p>
+<pre><code class="language-json">&quot;refund_requested&quot;: {
+  &quot;type&quot;: &quot;noul&quot;,
+  &quot;instructions&quot;: &quot;Does `ticket.messages[0].text` request a refund?&quot;
+},
+&quot;policy_ok&quot;: {
+  &quot;type&quot;: &quot;noul&quot;,
+  &quot;instructions&quot;: &quot;Does `refund_policy` support the refund in `ticket.messages[0].text` given `order.charges`?&quot;
+}
+</code></pre>
+<p>常见坏写法与改法：</p>
+<table>
+<thead>
+<tr>
+<th>坏写法</th>
+<th>为什么差</th>
+<th>改法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>「全面分析这张工单并给出处理建议」</td>
+<td>不是瞬间判断，答案不可分支</td>
+<td>拆成 queue / urgency / needs_human</td>
+</tr>
+<tr>
+<td>题 ID 叫 <code>is_refund</code> 但 instructions 很含糊</td>
+<td>ID 不参与推理</td>
+<td>把条件写全进 instructions</td>
+</tr>
+<tr>
+<td>把整本知识库塞进每题</td>
+<td>撞 per-question 32k，变慢变不准</td>
+<td>state 只留本案相关；知识库先检索再塞摘要</td>
+</tr>
+<tr>
+<td>用 chat 式 system prompt 堆角色扮演</td>
+<td>System One 不是对话模型</td>
+<td>用 criteria 定义边界，用代码组合答案</td>
+</tr>
+</tbody>
+</table>
+<p>复杂判断用 <strong>Composite scoring</strong>：多道 <code>score</code>/<code>noul</code> 并行，权重写在你的代码里；优先级变了只改权重，不必重写一整段 prompt。</p>
+<hr />
+<h2>4. 多题并行实战：工单路由（noul + choice + score）</h2>
+<p>下面把三类题塞进<strong>一次</strong>请求：是否要人工升级、进哪个队列、紧急度多少。这是最常见的落地模板——同一 <code>state</code> 投机扇出，代码决定用哪几个答案。</p>
+<pre><code class="language-bash">curl -sS https://api.typesafe.ai/v1/systemone \
+  -H &quot;Authorization: Bearer $TYPESAFE_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;model&quot;: &quot;jev-1.14.0&quot;,
+    &quot;state&quot;: {
+      &quot;ticket&quot;: {
+        &quot;subject&quot;: &quot;API 500 on checkout&quot;,
+        &quot;body&quot;: &quot;Checkout started returning 500 about 20 minutes ago. No orders can complete. Please escalate.&quot;
+      },
+      &quot;sla&quot;: &quot;P1 if revenue path is blocked.&quot;
+    },
+    &quot;questions&quot;: {
+      &quot;needs_human&quot;: {
+        &quot;type&quot;: &quot;noul&quot;,
+        &quot;instructions&quot;: &quot;Does `ticket.body` require immediate human escalation given `sla`?&quot;
+      },
+      &quot;queue&quot;: {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;instructions&quot;: &quot;Which queue should own `ticket`?&quot;,
+        &quot;criteria&quot;: {
+          &quot;billing&quot;: &quot;Payment, invoice, or subscription charges&quot;,
+          &quot;technical&quot;: &quot;Bugs, outages, or integration errors&quot;,
+          &quot;sales&quot;: &quot;Pricing, plans, or account upgrades&quot;
+        }
+      },
+      &quot;urgency&quot;: {
+        &quot;type&quot;: &quot;score&quot;,
+        &quot;instructions&quot;: &quot;How urgent is `ticket` for engineering?&quot;,
+        &quot;criteria&quot;: [
+          &quot;Can wait until next business day&quot;,
+          &quot;Needs attention this week&quot;,
+          &quot;Needs attention today / revenue blocked&quot;
+        ]
+      }
+    }
+  }'
+</code></pre>
+<p>示例响应形状：</p>
+<pre><code class="language-json">{
+  &quot;model&quot;: &quot;jev-1.14.0&quot;,
+  &quot;answers&quot;: {
+    &quot;needs_human&quot;: { &quot;type&quot;: &quot;noul&quot;, &quot;noul&quot;: 0.93 },
+    &quot;queue&quot;: {
+      &quot;type&quot;: &quot;choice&quot;,
+      &quot;choice&quot;: &quot;technical&quot;,
+      &quot;confidence&quot;: 0.95,
+      &quot;probabilities&quot;: {
+        &quot;billing&quot;: 0.02,
+        &quot;technical&quot;: 0.96,
+        &quot;sales&quot;: 0.02
+      }
+    },
+    &quot;urgency&quot;: {
+      &quot;type&quot;: &quot;score&quot;,
+      &quot;score&quot;: 1.8,
+      &quot;confidence&quot;: 0.7,
+      &quot;legend&quot;: {
+        &quot;0&quot;: &quot;Can wait until next business day&quot;,
+        &quot;1&quot;: &quot;Needs attention this week&quot;,
+        &quot;2&quot;: &quot;Needs attention today / revenue blocked&quot;
+      },
+      &quot;probabilities&quot;: { &quot;0&quot;: 0.05, &quot;1&quot;: 0.1, &quot;2&quot;: 0.85 }
+    }
+  },
+  &quot;usage&quot;: { &quot;input_tokens&quot;: 380, &quot;output_tokens&quot;: 60 }
+}
+</code></pre>
+<h3>同请求的 Python SDK 草图</h3>
+<pre><code class="language-python">from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    &quot;ticket&quot;: {
+        &quot;subject&quot;: &quot;API 500 on checkout&quot;,
+        &quot;body&quot;: &quot;Checkout started returning 500 about 20 minutes ago. No orders can complete.&quot;,
+    },
+    &quot;sla&quot;: &quot;P1 if revenue path is blocked.&quot;,
+}
+
+with TypeSafeClient() as client:
+    resp = client.system_one(
+        model=&quot;jev-1.14.0&quot;,
+        state=state,
+        questions={
+            &quot;needs_human&quot;: Noul(
+                instructions=&quot;Does `ticket.body` require immediate human escalation given `sla`?&quot;,
+            ),
+            &quot;queue&quot;: Choice(
+                instructions=&quot;Which queue should own `ticket`?&quot;,
+                criteria={
+                    &quot;billing&quot;: &quot;Payment, invoice, or subscription charges&quot;,
+                    &quot;technical&quot;: &quot;Bugs, outages, or integration errors&quot;,
+                    &quot;sales&quot;: &quot;Pricing, plans, or account upgrades&quot;,
+                },
+            ),
+            &quot;urgency&quot;: Score(
+                instructions=&quot;How urgent is `ticket` for engineering?&quot;,
+                criteria=[
+                    &quot;Can wait until next business day&quot;,
+                    &quot;Needs attention this week&quot;,
+                    &quot;Needs attention today / revenue blocked&quot;,
+                ],
+            ),
+        },
+    )
+
+print(resp.answers[&quot;needs_human&quot;].noul)
+print(resp.answers[&quot;queue&quot;].choice, resp.answers[&quot;queue&quot;].confidence)
+print(resp.answers[&quot;urgency&quot;].score, resp.answers[&quot;urgency&quot;].confidence)
+</code></pre>
+<p><strong>性能直觉：</strong> 官方 cookbook 用「13 题一批 vs 13 次单题」说明：批处理可显著更便宜、更快，且答案形态不变。习惯「一题一请求」的 agent/脚本，改成扇出后收益最大。</p>
+<p>若某题依赖上一题的答案才能构造下一题的 <code>state</code>/选项（例如层级分类），才做第二次请求；否则优先同请求并行，在代码里忽略用不上的答案。</p>
+<hr />
+<h2>5. 图片 + box：multipart 与 noul 配对</h2>
+<p>图像与 <code>box</code> 属于 <strong>danger zone</strong>（官方称 dreamer-ready：欢迎原型探索，<strong>接口形状与精度仍可能演进</strong>，勿默认当生产真理）。每次含图或 <code>box</code> 的请求必须带：</p>
+<pre><code class="language-http">TypeSafe-Danger-Zone-Images: true
+</code></pre>
+<p>官方提醒：<strong>多模态整体弱于纯文本</strong>；复杂判断请拆题、写清目标。音频/视频不直接吃，需先转文本或结构化字段再进 <code>state</code>。图片可通过 <code>assets</code> 组合进 <code>state</code>、<code>instructions</code>、甚至 <code>criteria</code>（占位符 find-and-replace）。</p>
+<p><img alt="Box 原语文档：分数坐标包围盒" src="imgs/03.png" /></p>
+<h3>5.1 multipart curl 草图（推荐）</h3>
+<p>第一部分名必须是 <code>request</code>（JSON）；每个图像 part 名与 <code>assets.*.part</code> 对齐：</p>
+<pre><code class="language-bash">curl -sS https://api.typesafe.ai/v1/systemone \
+  -H &quot;Authorization: Bearer $TYPESAFE_API_KEY&quot; \
+  -H &quot;TypeSafe-Danger-Zone-Images: true&quot; \
+  -F 'request={
+    &quot;model&quot;: &quot;jev-1.14.0&quot;,
+    &quot;state&quot;: {&quot;photo&quot;: &quot;asset-kitchen&quot;},
+    &quot;assets&quot;: {
+      &quot;asset-kitchen&quot;: { &quot;type&quot;: &quot;image&quot;, &quot;part&quot;: &quot;kitchen-photo&quot; }
+    },
+    &quot;questions&quot;: {
+      &quot;mug_visible&quot;: {
+        &quot;type&quot;: &quot;noul&quot;,
+        &quot;instructions&quot;: &quot;Is there a coffee mug in `photo`?&quot;
+      },
+      &quot;mug&quot;: {
+        &quot;type&quot;: &quot;box&quot;,
+        &quot;instructions&quot;: &quot;the coffee mug in `photo`&quot;
+      }
+    }
+  };type=application/json' \
+  -F 'kitchen-photo=@kitchen.jpg;type=image/jpeg'
+</code></pre>
+<p>期望 <code>answers.mug</code> 类似：</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;box&quot;,
+  &quot;box&quot;: { &quot;top&quot;: 0.25, &quot;bottom&quot;: 0.82, &quot;left&quot;: 0.44, &quot;right&quot;: 0.84 },
+  &quot;confidence&quot;: 0.92
+}
+</code></pre>
+<h3>5.2 应用侧：存在性门禁 + 像素裁剪</h3>
+<pre><code class="language-python">VISIBLE_MIN = 0.70  # 用你自己的图标定
+
+vis = answers[&quot;mug_visible&quot;][&quot;noul&quot;]
+box_ans = answers[&quot;mug&quot;]
+
+if vis &lt; VISIBLE_MIN:
+    result = {&quot;found&quot;: False, &quot;reason&quot;: &quot;noul_below_threshold&quot;, &quot;noul&quot;: vis}
+else:
+    edges = box_ans[&quot;box&quot;]
+    w, h = image.size  # PIL Image
+    crop_box = (
+        round(edges[&quot;left&quot;] * w),
+        round(edges[&quot;top&quot;] * h),
+        round(edges[&quot;right&quot;] * w),
+        round(edges[&quot;bottom&quot;] * h),
+    )
+    # 低置信时外扩 padding，降低切掉目标的风险
+    conf = box_ans.get(&quot;confidence&quot;)
+    if conf is not None and conf &lt; 0.6:
+        pad = 0.05
+        edges = {
+            &quot;left&quot;: max(0.0, edges[&quot;left&quot;] - pad),
+            &quot;top&quot;: max(0.0, edges[&quot;top&quot;] - pad),
+            &quot;right&quot;: min(1.0, edges[&quot;right&quot;] + pad),
+            &quot;bottom&quot;: min(1.0, edges[&quot;bottom&quot;] + pad),
+        }
+        crop_box = (
+            round(edges[&quot;left&quot;] * w),
+            round(edges[&quot;top&quot;] * h),
+            round(edges[&quot;right&quot;] * w),
+            round(edges[&quot;bottom&quot;] * h),
+        )
+    result = {&quot;found&quot;: True, &quot;crop&quot;: crop_box, &quot;confidence&quot;: conf, &quot;noul&quot;: vis}
+</code></pre>
+<p>小目标在超大图上容易丢：可先分区/<code>choice</code> 选瓦片，再对瓦片做 <code>box</code>，最后把分数坐标换算回全图。多个不同目标 → 多道 <code>box</code>；同种多个目标 → 在 instructions 里写清「哪一个」（例如 nearest the sink），或另加 <code>choice</code> 区分 none/one/several。</p>
+<p>JSON + <code>data_base64</code> 适合小图调试；生产大图优先 multipart。请求体上限 <strong>32 MiB</strong>。</p>
+<hr />
+<h2>6. 长上下文危险区</h2>
+<p>默认 64k / 32k。需要合同时、长转录等场景时：</p>
+<pre><code class="language-http">TypeSafe-Danger-Zone-Long-Context: true
+</code></pre>
+<p>两端抬到 <strong>262k</strong>。单价不变，但官方写得很直白：<strong>更慢、更不准</strong>。优先裁剪 <code>state</code>、拆请求；长上下文是逃生舱，不是默认模式。</p>
+<pre><code class="language-bash">curl -sS https://api.typesafe.ai/v1/systemone \
+  -H &quot;Authorization: Bearer $TYPESAFE_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;TypeSafe-Danger-Zone-Long-Context: true&quot; \
+  -d '{
+    &quot;model&quot;: &quot;jev-1.14.0&quot;,
+    &quot;state&quot;: &quot;&lt;long contract or transcript text&gt;&quot;,
+    &quot;questions&quot;: {
+      &quot;has_termination&quot;: {
+        &quot;type&quot;: &quot;noul&quot;,
+        &quot;instructions&quot;: &quot;Does the state include a clause that lets either party end the agreement early?&quot;
+      }
+    }
+  }'
+</code></pre>
+<p>超限常见表现是 <code>400</code>（含上下文相关错误码一类）；先减 <code>state</code> 或开长上下文头，再查组织限流。</p>
+<hr />
+<h2>7. 置信度落地：阈值写在应用里</h2>
+<table>
+<thead>
+<tr>
+<th>题型</th>
+<th>「不确定」怎么读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>noul</code></td>
+<td>看 <code>noul</code>；≈0.5 最不确定。可选 <code>abs(2*p-1)</code></td>
+</tr>
+<tr>
+<td><code>choice</code> / <code>score</code></td>
+<td>用返回的 <code>confidence</code>（由 <code>probabilities</code> 导出）；也可自用 <code>p_max</code> 或 top/second 比</td>
+</tr>
+<tr>
+<td><code>box</code></td>
+<td>有 <code>confidence</code>（偶发 null）；低则 padding / 换图 / 依赖配对 <code>noul</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>没有官方万能阈值。</strong> 按风险在自己样本上标定：只读展示可放宽；退款、删改、自动外呼等抬高。</p>
+<p>三档行为模板：</p>
+<ol>
+<li><strong>高置信</strong> → 自动执行  </li>
+<li><strong>中置信</strong> → 自动但打标抽检 / 二次确认  </li>
+<li><strong>低置信</strong> → 人工或拒动  </li>
+</ol>
+<pre><code class="language-python">def route_ticket(answers, *, noul_hi=0.85, choice_hi=0.80, choice_lo=0.50):
+    needs = answers[&quot;needs_human&quot;][&quot;noul&quot;]
+    queue = answers[&quot;queue&quot;]
+    urg = answers[&quot;urgency&quot;]
+    noul_conf = abs(2 * needs - 1)
+
+    if noul_conf &lt; 0.30 or queue[&quot;confidence&quot;] &lt; choice_lo:
+        return {&quot;action&quot;: &quot;human_review&quot;, &quot;reason&quot;: &quot;low_confidence&quot;}
+
+    if needs &gt;= noul_hi and queue[&quot;confidence&quot;] &gt;= choice_hi:
+        return {
+            &quot;action&quot;: &quot;auto_escalate&quot;,
+            &quot;queue&quot;: queue[&quot;choice&quot;],
+            &quot;urgency&quot;: urg[&quot;score&quot;],
+        }
+
+    # 中置信：可分队列，但进审计队列
+    return {
+        &quot;action&quot;: &quot;auto_route_with_audit&quot;,
+        &quot;queue&quot;: queue[&quot;choice&quot;],
+        &quot;urgency&quot;: urg[&quot;score&quot;],
+        &quot;queue_confidence&quot;: queue[&quot;confidence&quot;],
+        &quot;urgency_confidence&quot;: urg[&quot;confidence&quot;],
+    }
+
+
+def gate_destructive(choice_answer, *, min_conf=0.90):
+    &quot;&quot;&quot;高风险动作：阈值抬高。&quot;&quot;&quot;
+    if choice_answer[&quot;confidence&quot;] &lt; min_conf:
+        return &quot;confirm_with_user&quot;
+    return &quot;execute&quot;
+</code></pre>
+<p>把阈值、模型版本、采样集版本写进配置与评测报告；换 <code>jev-1.14.0</code> ←→ <code>jev-1.13.0</code> 时重新跑回归，不要假设别名滚动后阈值仍成立。</p>
+<hr />
+<h2>8. 排错</h2>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>常见原因</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>400</code> / <strong><code>api_usage_error</code></strong>（尤其 box）</td>
+<td>在 <strong><code>jev-1.13.0</code></strong> 上使用了 <code>type: "box"</code>；或未开图像头却带了图像/<code>box</code></td>
+<td><code>model</code> 改为 <strong><code>jev-1.14.0</code></strong>；加 <code>TypeSafe-Danger-Zone-Images: true</code></td>
+</tr>
+<tr>
+<td><code>401</code></td>
+<td>Key 缺失/错误</td>
+<td>检查 <code>Authorization: Bearer …</code></td>
+</tr>
+<tr>
+<td><code>422</code></td>
+<td>缺字段、schema 错（如 <code>choice</code>/<code>score</code> 无 <code>criteria</code>）</td>
+<td>对照 System One OpenAPI 改题面</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>组织 tokens/s 或 requests/s 超限</td>
+<td>指数退避；官方 SDK 默认重试并尊重 <code>retry-after</code>；直连 HTTP 请自写</td>
+</tr>
+<tr>
+<td><code>413</code></td>
+<td>体 &gt; 32 MiB</td>
+<td>缩小图/压缩；可单层 <code>Content-Encoding: gzip</code></td>
+</tr>
+<tr>
+<td><code>529</code></td>
+<td>服务过载</td>
+<td>短延迟后重试</td>
+</tr>
+<tr>
+<td>多模态差</td>
+<td>官方：图文弱于纯文本</td>
+<td>拆题、写清目标、大图分区再 <code>box</code>；存在性用 <code>noul</code></td>
+</tr>
+<tr>
+<td>答案「飘」</td>
+<td>滚动别名或 state 过脏/过长</td>
+<td>pin <code>jev-1.14.0</code>；清洗 state；非必要勿开长上下文</td>
+</tr>
+<tr>
+<td>语言效果不稳</td>
+<td>英文为主训；CJK 等需自测</td>
+<td>1.14 官方称多语言有改进，仍用你的样本标定</td>
+</tr>
+</tbody>
+</table>
+<h3>8.1 联调顺序建议</h3>
+<ol>
+<li>先用纯文本 <code>noul</code> 打通鉴权与计费字段（看 <code>usage.input_tokens</code>）。  </li>
+<li>再加 <code>choice</code>/<code>score</code>，把阈值打日志但不自动执行。  </li>
+<li>用历史工单离线回放，画置信度分布，再定自动/人工分界。  </li>
+<li>最后才开图像头与 <code>box</code>，并且用「noul 门禁 + 人工抽检框」双保险。  </li>
+<li>长上下文头单独开关：默认关闭，压测通过后再对白名单流量开启。</li>
+</ol>
+<h3>8.2 与 1.13 并存时</h3>
+<p>一段时间内 <code>jev-1.13.0</code> 仍可用。文本三题型（noul/choice/score）两边都能跑；<strong>只有 <code>box</code> 绑定 1.14</strong>。迁移时：</p>
+<ul>
+<li>新代码路径 pin <code>jev-1.14.0</code>；旧路径可暂留 1.13。  </li>
+<li>不要假设同一题面在两版上的 <code>confidence</code> 分布完全一致——换版重标定。  </li>
+<li>官方计划在正式弃用前给出窗口提示（博客口径：1.13 约 60 天预警量级，具体以官方后续政策为准）。</li>
+</ul>
+<hr />
+<p><img alt="官方博客：1.14 与 danger zone 说明" src="imgs/04.png" /></p>
+<hr />
+<h2>9. 上线前检查清单</h2>
+<ol>
+<li>生产请求写死 <strong><code>"model": "jev-1.14.0"</code></strong>，日志记录响应 <code>model</code> 与 <code>usage</code>。  </li>
+<li>题面原子化；同 <code>state</code> 尽量一批并行问完（投机扇出）。  </li>
+<li><code>choice</code>/<code>score</code> 用 <code>confidence</code> 分自动 / 抽检 / 人工；<code>noul</code> 用概率本身。  </li>
+<li><code>box</code> 必配对 <code>noul</code>；图像头、模型版本写入集成测试。  </li>
+<li>用真实工单与图片标定阈值后再调重试与限流策略。  </li>
+<li>危险区（图像、长上下文、<code>box</code>）与稳定决策路径分轨：原型可以玩，生产要单独压测。</li>
+</ol>
+<hr />
+<h2>参考链接（官方）</h2>
+<ul>
+<li>发布说明：https://typesafe.ai/blog/jev-1-14  </li>
+<li>Models / 上下文：https://docs.typesafe.ai/models  </li>
+<li>System One API：https://docs.typesafe.ai/api/system-one  </li>
+<li>Primitives 总览：https://docs.typesafe.ai/primitives  </li>
+<li>Choice：https://docs.typesafe.ai/primitives/choice  </li>
+<li>Box：https://docs.typesafe.ai/primitives/box  </li>
+</ul>
+<p>（Score、Noul、Confidence、Images 等同域文档可从 Primitives / Models 页继续跳转。）按本文从 Key → 首请求 → 四题型 → 并行路由 → 图文 box → 长上下文 → 置信度 → 排错走通一遍后，你就有把 Jev 嵌进路由与门禁流水线的完整骨架。</p>
+<footer>镜像自 CSDN @xianyu120 · 内容以原文为准</footer>
+</article></div></body></html>
